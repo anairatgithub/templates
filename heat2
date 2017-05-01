@@ -57,8 +57,8 @@ resources:
            str_replace:
               template: |
                  #!/bin/bash -v
-                 curl -k --data "host_config_key=tower_host_config_key" https://tower_ip:443/api/v1/job_templates/9/callback/
-              params:
+                  curl -f -k -H 'Content-Type: application/json' -XPOST -d '{"host_config_key": "8217c0a711b3af173be033aab12534f0", "extra_vars": {"HEAT_ENDPOINT": "wait_endpoint","HEAT_TOKEN": "wait_token"}}' https://tower_ip:443/api/v1/job_templates/7/callback/
+                  params:
                     tower_ip: { get_param: tower_private_ip }
                     tower_host_config_key: { get_param: tower_host_config_key }
 
@@ -102,6 +102,16 @@ resources:
          fixed_ips:
             - subnet_id: { get_param: private_subnet_id }
          security_groups: [ { get_param: security_groups } ]
+         
+   wait_condition:
+      type: OS::Heat::WaitCondition
+      properties:
+         handle: { get_resource: wait_handle }
+         count: 1
+         timeout: 1200
+  
+   wait_handle:
+      type: OS::Heat::WaitConditionHandle
 
 outputs:
   server_private_ip:
