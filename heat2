@@ -1,0 +1,109 @@
+heat_template_version: 2016-10-14
+# starting from Newton you can can use the date key or label "newton"
+# The key with value 2016-10-14 or newton indicates that the YAML document is a HOT template and it
+# may contain features added and/or removed up until the Newton release.
+# image: { get_param: [ env_data, image , get_param: [ env ] ] }
+# - subnet_id: { get_param: [ env_data, private_subnet_id, get_param: [ env ] ] }
+# floating_network_id: { { get_param: [ env_data, public_subnet_id, get_param: [ env ] ]}
+# inspired from https://keithtenzer.com/2016/05/09/openstack-heat-and-ansible-automation-born-in-the-cloud/
+description: Heat template for generic Nova instance
+
+parameters:
+   private_net_id:
+      type: string
+   image:
+      type: string
+   private_subnet_id:
+      type: string
+   public_subnet_id:
+      type: string
+   server_name:
+      type: string
+      description: Name of server
+      default: wordpress1
+   key_name:
+      type: string
+      description: SSH key to connect to the servers
+      default: admin
+   flavor:
+      type: string
+      description: flavor used by the servers
+      default: m1.medium
+   security_groups:
+      type: string
+      description: security groups for ansible tower
+      default: [ default ]
+   tower_host_config_key:
+      type: string
+      description: ansible tower API key
+      default: 57344eaf880fcdc81686197d18d0759a
+   tower_private_ip:
+      type: string
+      description: ansible tower private IP
+      default: 10.4.0.16   
+
+resources:
+   bootable_volume:
+      type: OS::Cinder::Volume
+      properties:
+         size: 30
+         image: rhel-7.3-35.x86_64_v2
+   tower_call_back:
+      type: OS::Heat::SoftwareConfig
+      # https://docs.openstack.org/developer/heat/template_guide/openstack.html#OS::Heat::SoftwareConfig
+      properties:
+         group: ungrouped
+         config: 
+           str_replace:
+              template: |
+                 #!/bin/bash -v
+                 curl -k --data "host_config_key=tower_host_config_key" https://tower_ip:443/api/v1/job_templates/9/callback/
+              params:
+                    tower_ip: { get_param: tower_private_ip }
+                    tower_host_config_key: { get_param: tower_host_config_key }
+
+   cloudconfig:
+      type: OS::Heat::CloudConfig
+      properties:
+            cloud_config:
+               manage_resolv_conf: true
+               resolv_conf:
+                  nameservers: ['10.3.4.7', '8.8.8.8']
+                  searchdomains:
+                     - cwrtech.local
+                  domain: cwrtech.local
+   post_work:
+      type: OS::Heat::MultipartMime
+      properties:
+            parts:
+               - config: { get_resource: cloudconfig }
+               - config: { get_resource: tower_call_back }
+   webserver:
+      type: OS::Nova::Server
+      properties:
+         name: { get_param: server_name }
+         flavor: { get_param: flavor }
+         key_name: { get_param: key_name }
+         image: { get_param: image }
+         networks:
+            - port: { get_resource: server_port }
+         block_device_mapping:
+             - device_name: vda
+               volume_id: { get_resource: bootable_volume }
+               delete_on_termination: false
+         user_data_format: RAW
+         user_data:       
+            get_resource: post_work
+
+   server_port:
+      type: OS::Neutron::Port
+      properties:
+         network_id: { get_param: private_net_id }
+         fixed_ips:
+            - subnet_id: { get_param: private_subnet_id }
+         security_groups: [ { get_param: security_groups } ]
+
+outputs:
+  server_private_ip:
+    description: IP address of server on private network
+    value: { get_attr: [ webserver, first_address ] }
