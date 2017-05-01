@@ -57,11 +57,17 @@ resources:
            str_replace:
               template: |
                  #!/bin/bash -v
-                  curl -f -k -H 'Content-Type: application/json' -XPOST -d '{"host_config_key": "8217c0a711b3af173be033aab12534f0", "extra_vars": {"HEAT_ENDPOINT": "wait_endpoint","HEAT_TOKEN": "wait_token"}}' https://tower_ip:443/api/v1/job_templates/7/callback/
+                  #curl -k --data "host_config_key=tower_host_config_key" https://tower_ip:443/api/v1/job_templates/9/callback/
+                  curl -f -k -H 'Content-Type: application/json' -XPOST -d '{"host_config_key": "tower_host_config_key", "extra_vars": {"HEAT_ENDPOINT": "wait_endpoint","HEAT_TOKEN": "wait_token"}}' https://tower_ip:443/api/v1/job_templates/9/callback/
                   params:
+                    # heat will resolve these variables and stick it in the URL above and the instance, when it runs cloud init
+                    # will use it to call back
+                    # the wait handle resouce will o/p curl_cli, endpoint and token which is used below
                     tower_ip: { get_param: tower_private_ip }
                     tower_host_config_key: { get_param: tower_host_config_key }
-
+                    wc_notify: { get_attr: ['wait_handle', 'curl_cli'] }
+                    wait_endpoint: { get_attr: [ wait_handle, endpoint ] }
+                    wait_token: { get_attr: [ wait_handle, token ] }
    cloudconfig:
       type: OS::Heat::CloudConfig
       properties:
