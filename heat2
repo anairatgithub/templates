@@ -123,3 +123,13 @@ outputs:
   server_private_ip:
     description: IP address of server on private network
     value: { get_attr: [ webserver, first_address ] }
+  curl_cli:
+    value: { get_attr: ['wait_handle', 'curl_cli'] }
+  wait_endpoint:
+    value: { get_attr: ['wait_handle', 'endpoint'] }
+  wait_token:
+    value: { get_attr: ['wait_handle', 'token'] }
+  wc_data:
+    value: { get_attr: ['wait_condition', 'data'] }
+
+
